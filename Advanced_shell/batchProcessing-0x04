@@ -11,7 +11,10 @@ mkdir -p "$OUTPUT_DIR"
 ERROR_LOG="fetch_errors.txt"
 > "$ERROR_LOG"
 
-# Function to fetch a single Pokémon in background
+# Array to store background process PIDs
+declare -a PIDS
+
+# Function to fetch Pokémon data
 fetch_pokemon() {
     local pokemon=$1
     echo "Fetching data for $pokemon..."
@@ -25,12 +28,24 @@ fetch_pokemon() {
     fi
 }
 
-# Launch all fetches in parallel
+# Launch all fetches in parallel and track jobs
 for pokemon in "${POKEMON_LIST[@]}"; do
     fetch_pokemon "$pokemon" &
+    PIDS+=($!)  # Save the PID
 done
 
-# Wait for all background processes to complete
-wait
+# Show background jobs
+echo "Running jobs:"
+jobs
 
-echo "✅ All Pokémon data fetched."
+# Wait for all jobs and handle failures
+for pid in "${PIDS[@]}"; do
+    wait "$pid" || {
+        echo "⚠️ Process with PID $pid failed. Killing all remaining background jobs..."
+        # Kill all jobs if one fails
+        kill $(jobs -p) 2>/dev/null
+        exit 1
+    }
+done
+
+echo "✅ All Pokémon data fetched successfully."
